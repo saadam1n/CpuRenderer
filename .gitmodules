@@ -1,0 +1,9 @@
+[submodule "extern/glm"]
+	path = extern/glm
+	url = https://github.com/g-truc/glm
+[submodule "extern/sail"]
+	path = extern/sail
+	url = https://github.com/happy-sea-fox/sail
+[submodule "extern/assimp"]
+	path = extern/assimp
+	url = https://github.com/assimp/assimp
