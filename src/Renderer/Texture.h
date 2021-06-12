@@ -1,7 +1,10 @@
 #pragma once
 
+#include <glm/glm.hpp>
 #include <stdint.h>
 #include <math.h>
+
+#include <iostream>
 
 template<typename T>
 class Texture {
@@ -53,10 +56,19 @@ public:
 	}
 
 	Pixel Read(PixelCoordinate X, PixelCoordinate Y) const  {
-		return GetPixel(X, Y);
+		return Data[GetTextureIndex(X, Y)];
+	}
+
+	// Currently only nearest neighbor sampling
+	Pixel Sample(const glm::vec2& UV) {
+		glm::ivec2 Coords = glm::ivec2(glm::round(UV * glm::vec2(Width, Height)));
+		return Read((PixelCoordinate)Coords.x, (PixelCoordinate)Coords.y);
 	}
 
 	size_t GetTextureIndex(PixelCoordinate X, PixelCoordinate Y) const {
+		if (!ValidateCoordinates(X, Y)) {
+			return 0;
+		}
 		return Y * Width + X;
 	}
 
@@ -121,4 +133,15 @@ private:
 	size_t Height;
 
 	FilteringMode Filter;
+
+	bool ValidateCoordinates(PixelCoordinate X, PixelCoordinate Y) const {
+		bool ValidX = X < Width;
+		bool ValidY = Y < Height;
+		if (ValidX && ValidY) {
+			return true;
+		} else {
+			std::cout << "WARNING: INVALID COORDINATES TO WRITE TO:\t " << X << '\t ' << Y << "\t WIDTH AND HEIGHT:\t " << Width << "\t " << Height << '\n';
+			return false;
+		}
+	}
 };

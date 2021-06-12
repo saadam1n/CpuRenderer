@@ -511,7 +511,7 @@ void NodeSerialized::MakeLeaf(void) {
 	Leaf.Size = -Leaf.Size;
 }
 
-NodeType NodeSerialized::GetType(void) {
+NodeType NodeSerialized::GetType(void) const {
 	return Leaf.Size < 0 ? NodeType::LEAF : NodeType::NODE;
 }
 

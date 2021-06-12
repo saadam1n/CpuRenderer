@@ -25,7 +25,7 @@ enum class NodeType {
 struct NodeSerialized {
 
 	void MakeLeaf(void);
-	NodeType GetType(void);
+	NodeType GetType(void) const;
 
 	AABB BoundingBox;
 

@@ -1,4 +1,6 @@
 #include "Triangle.h"
+#include <limits>
+#include <iostream>
 
 Vertex TriangleIntersection::GetInterpolatedVertex(void) const {
 	Vertex InterpolatedVertex =
@@ -11,51 +13,84 @@ Vertex TriangleIntersection::GetInterpolatedVertex(void) const {
 
 	InterpolatedVertex.Normal = glm::normalize(InterpolatedVertex.Normal);
 
+	//if (Backface) {
+	//	InterpolatedVertex.Normal = -InterpolatedVertex.Normal;
+	//}
+
 	return InterpolatedVertex;
 }
 
-bool Triangle::Intersect(const Ray& R, TriangleIntersection& IntersectionInfo) const {
-	glm::vec3 V01 = Vertices[1].Position - Vertices[0].Position;
-	glm::vec3 V02 = Vertices[2].Position - Vertices[0].Position;
+bool Triangle::Intersect(const Ray& R, TriangleIntersection& IntersectionInfo, const MaterialProperties* Material) const {
+#if 1
+	return IntersectMollerTrumbore(R, IntersectionInfo, Material);
+#else
+	return IntersectPlaneBarycentric(R, IntersectionInfo, Material);
+#endif
+}
 
-	glm::vec3 Pvec = glm::cross(R.Direction, V02);
-	float Determinant = glm::dot(V01, Pvec);
+bool Triangle::IntersectMollerTrumbore(const Ray& R, TriangleIntersection& IntersectionInfo, const MaterialProperties* Material) const {
+	glm::vec3 Edge1 = Vertices[1].Position - Vertices[0].Position;
+	glm::vec3 Edge2 = Vertices[2].Position - Vertices[0].Position;
 
-	constexpr float kEpsilon = 1e-6f;
-	if (fabsf(Determinant) < kEpsilon) {
-		return false;
-	}
+	glm::vec3 Tv = R.Origin - Vertices[0].Position;
+	glm::vec3 Pv = glm::cross(R.Direction, Edge2);
+	glm::vec3 Qv = glm::cross(Tv, Edge1);
 
+	float Determinant = glm::dot(Pv, Edge1);
 	float DeterminantRCP = 1.0f / Determinant;
 
-	glm::vec3 Tvec = R.Origin - Vertices[0].Position;
-	float U = glm::dot(Tvec, Pvec) * DeterminantRCP;
+	float T = DeterminantRCP * glm::dot(Qv, Edge2);
+	float U = DeterminantRCP * glm::dot(Tv, Pv);
+	float V = DeterminantRCP * glm::dot(Qv, R.Direction);
 
-	if (U < 0.0f || U > 1.0f) {
-		return false;
-	}
+	bool Backface = false;
 
-	glm::vec3 Qvec = glm::cross(Tvec, V01);
-	float V = glm::dot(R.Direction, Qvec) * DeterminantRCP;
-
-	if (V < 0.0f || U + V  > 1.0f) {
-		return false;
-	}
-
-	float T = glm::dot(V02, Qvec) * DeterminantRCP;
-
-	if (T < IntersectionInfo.Depth && T > 0.0f) {
+	constexpr float kEpsilon = 1e-3f;
+	if (
+		(T < IntersectionInfo.Depth && T > kEpsilon) &&
+		!(U < 0.0f || U > 1.0f) &&
+		!(V < 0.0f || U + V  > 1.0f) &&
+		!(Determinant < 0.0f ? [](float& Det, bool& Back) -> float {Back = true; return -Det; }(Determinant, Backface) : Determinant < std::numeric_limits<float>::epsilon())
+		) {
 		IntersectionInfo.Depth = T;
 
 		IntersectionInfo.Surface = this;
-		IntersectionInfo.U = U;
-		IntersectionInfo.V = V;
+		IntersectionInfo.U = 1.0f;
+		IntersectionInfo.V = 0.0f;
+
+		IntersectionInfo.Backface = Backface;
+
+		IntersectionInfo.Material = Material;
 
 		return true;
-	} else {
+	}
+	else {
 		return false;
 	}
 }
+
+/*
+Intersect the plane represented by the triangle
+Then compute the barycentric coordinates to test whether it is inside or outside of it
+*/
+bool Triangle::IntersectPlaneBarycentric(const Ray& R, TriangleIntersection& IntersectionInfo, const MaterialProperties* Material) const {
+	glm::vec3 Edge1 = Vertices[1].Position - Vertices[0].Position;
+	glm::vec3 Edge2 = Vertices[2].Position - Vertices[0].Position;
+
+	glm::vec3 Normal = glm::cross(Edge1, Edge2);
+	Normal = glm::normalize(Normal);
+
+	float PlaneDistance = glm::dot(Normal, Vertices[0].Position - R.Origin);
+	float CosineTheta   = glm::dot(Normal, R.Direction);
+
+	float T = PlaneDistance / CosineTheta;
+	glm::vec3 P = R.Extend(T);
+
+	// Current solve the system by hand instead of using Cramer's rule
+
+	return false;
+}
+
 
 /*
 This didn't seem to work and instead seemed to slow things down
@@ -75,5 +110,45 @@ I'm still sure it benefits a parallel processor like the GPU
 		IntersectionInfo.V = V;
 
 		return true;
+	}
+*/
+
+/*
+
+
+*/
+
+/*
+	glm::vec3 V01 = Vertices[1].Position - Vertices[0].Position;
+	glm::vec3 V02 = Vertices[2].Position - Vertices[0].Position;
+
+	glm::vec3 Tv = R.Origin - Vertices[0].Position;
+	glm::vec3 Qv = glm::cross(Tv, V01);
+	glm::vec3 Pv = glm::cross(V02, R.Direction);
+
+	float Determinant    = glm::dot(V01, Pv);
+	float DeterminantRCP = 1.0f / Determinant;
+
+	float T = DeterminantRCP * glm::dot(Qv, V02);
+	float U = DeterminantRCP * glm::dot(Tv, Pv);
+	float V = DeterminantRCP * glm::dot(Qv, R.Direction);
+
+	if (
+		(T < IntersectionInfo.Depth && T > 0.0f) &&
+		!(U < 0.0f || U > 1.0f) &&
+		!(V < 0.0f || U + V  > 1.0f) &&
+		!(fabsf(Determinant) < std::numeric_limits<float>::epsilon())
+		) {
+		IntersectionInfo.Depth = T;
+
+		IntersectionInfo.Surface = this;
+		IntersectionInfo.U = 1.0f;
+		IntersectionInfo.V = 0.0f;
+
+		IntersectionInfo.Material = Material;
+
+		return true;
+	} else {
+		return false;
 	}
 */

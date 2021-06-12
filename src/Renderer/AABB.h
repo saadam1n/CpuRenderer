@@ -22,6 +22,10 @@ struct AABB : public Hittable {
 
 	bool Intersect(const Ray& R, AABBIntersection& IntersectionInfo) const;
 
-	glm::vec3 Min;
+	glm::vec3 Min; 
 	glm::vec3 Max;
+
+private:
+	bool IntersectSlab(const Ray& R, AABBIntersection& IntersectionInfo) const;
+	bool IntersectPoint(const Ray& R, AABBIntersection& IntersectionInfo) const;
 };

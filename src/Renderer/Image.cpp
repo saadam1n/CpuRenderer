@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 namespace ImageIO {
 
@@ -27,6 +28,18 @@ namespace ImageIO {
 
 	static ByteSerializer Serializer;
 
+	uint8_t TransformColor(float X) {
+		X = glm::clamp(X, 0.0f, 1.0f);
+		if (X <= 0.0031308f) {
+			X *= 12.92f;
+		}
+		else {
+			X = 1.055f * pow(X, 1.0f / 2.4f) - 0.055f;
+		}
+		X *= F32to8UI;
+		return (uint8_t)X;
+	}
+
 	void CreateImage(const char* Path, Texture<ColorRGB32F>& ImageData) {
 		// Reserve memory for text buffer
 		std::string ReservedMemory;
@@ -40,16 +53,16 @@ namespace ImageIO {
 				ColorRGB32F& CurrentColor = ImageData.GetPixel(X, Y);
 				// Convert to [0, 255] domain
 				ColorRGB8UI ByteColor;
-				ByteColor.R = (uint8_t)(CurrentColor.R * F32to8UI);
-				ByteColor.G = (uint8_t)(CurrentColor.G * F32to8UI);
-				ByteColor.B = (uint8_t)(CurrentColor.B * F32to8UI);
-				// Write color
+				ByteColor.r = TransformColor(CurrentColor.r);
+				ByteColor.g = TransformColor(CurrentColor.g);
+				ByteColor.b = TransformColor(CurrentColor.b);
+				// Write color (I could use a binary format here but human readability is useful sometimes)
 				TextBuffer
-					<< Serializer.Serialize(ByteColor.R)
+					<< Serializer.Serialize(ByteColor.r)
 					<< ' '
-					<< Serializer.Serialize(ByteColor.G)
+					<< Serializer.Serialize(ByteColor.g)
 					<< ' '
-					<< Serializer.Serialize(ByteColor.B)
+					<< Serializer.Serialize(ByteColor.b)
 					<< (X == ImageData.GetWidth() ? '\n' : ' ');
 			}
 		}

@@ -9,6 +9,7 @@ struct QualitySettings {};
 
 struct PathTracerQuality {
 	size_t SamplesPerPixel;
+	size_t NextEventEstimationSamples;
 };
 
 /*

@@ -1,8 +1,9 @@
 #include "Camera.h"
+#include "Constants.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 
-Camera::Camera(void) : Direction(0.0f, 0.0f, -1.0f), Position(0.0f), Rotation(glm::radians(-90.0f), 0.0f, 0.0f), ViewMatrix(1.0f) {}
+Camera::Camera(void) : Direction(0.0f, 0.0f, -1.0f), Position(0.0f), Rotation(glm::radians(-90.0f), 0.0f, 0.0f), ViewMatrix(1.0f), ApertureSize(0.35f), FocusDistance(2.5f) {}
 
 void Camera::GenerateImagePlane(void) {
 	glm::vec2 FOV = glm::vec2(AspectRatio * FieldOfView, FieldOfView);
@@ -82,10 +83,11 @@ void Camera::GenerateViewTransform(void) {
 
 	Direction = glm::normalize(Direction);
 
-	ViewMatrix = glm::mat3(glm::lookAt(glm::vec3(0.0f), Direction, glm::vec3(0.0f, 1.0f, 0.0f)));
+	ViewMatrix        = glm::mat3(glm::lookAt(glm::vec3(0.0f), Direction, glm::vec3(0.0f, 1.0f, 0.0f)));
+	ViewMatrixInverse = glm::inverse(ViewMatrix);
 }
 
-Ray Camera::GenerateRay(float X, float Y) const {
+Ray Camera::GenerateRay(SamplerDefault& Sampler, float X, float Y) const {
 	Ray R;
 	R.Origin = Position;
 
@@ -97,12 +99,17 @@ Ray Camera::GenerateRay(float X, float Y) const {
 
 	R.Direction = normalize(R.Direction);
 
-	return R;
-}
+	float T = -FocusDistance / R.Direction.z;
+	glm::vec3 FocusPoint = R.Direction * T;
 
-Ray Camera::GenerateRay(size_t X, size_t Y, size_t W, size_t H) const {
-	// I need all these casts to make sure it gets casted correctly because I don't know where the cast should actually go
-	return GenerateRay((float)X / (float)W, (float)Y / (float)H);
+	float Radius   = ApertureSize * std::sqrtf(Sampler.NextFloat());
+	float Phi = 2.0f * Constants::kPi * Sampler.NextFloat();
+
+	glm::vec3 RandomAperturePoint = glm::vec3(Radius * glm::vec2(std::sinf(Phi), std::cosf(Phi)), 0.0f);
+	R.Direction = glm::normalize(FocusPoint - RandomAperturePoint);
+	R.Origin += ViewMatrixInverse * RandomAperturePoint;
+
+	return R;
 }
 
 void Camera::Move(float Distance) {
